@@ -34,12 +34,6 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq apktool zipalign
 
-      - name: Find Android SDK
-        run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          find $ANDROID_HOME -name apksigner 2>/dev/null | head -5
-          find / -name apksigner -type f 2>/dev/null | head -5
-
       - name: Clone Mocika
         run: git clone --depth 1 --branch v1.4.0 https://github.com/mocikadev/mocika-shield.git mocika
 
@@ -49,7 +43,10 @@ jobs:
           cargo build --release -p shield-cli
 
       - name: Decode keystore
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release.keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '\n\r ' | xxd -r -p > release.keystore
+          ls -la release.keystore
+          file release.keystore
 
       - name: Protect
         run: |
