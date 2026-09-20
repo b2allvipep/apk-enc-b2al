@@ -1,0 +1,84 @@
+name: Encrypt APK
+
+on:
+  push:
+    paths:
+      - 'input/*.apk'
+  workflow_dispatch:
+
+jobs:
+  encrypt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq apktool zipalign
+
+      - name: Clone Mocika
+        run: git clone --depth 1 --branch v1.4.0 https://github.com/mocikadev/mocika-shield.git mocika
+
+      - name: Build CLI
+        run: |
+          cd mocika
+          cargo build --release -p shield-cli
+
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release.keystore
+
+      - name: Protect
+        run: |
+          mkdir -p output
+          APK=$(ls input/*.apk | head -1)
+          APKTOOL=$(which apktool)
+          APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -V | tail -1)
+          ./mocika/target/release/shield protect \
+            -i "$APK" \
+            -o "output/protected.apk" \
+            --apktool "$APKTOOL" \
+            --apksigner "$APKSIGNER" \
+            --json | tee protect.log
+
+      - name: Sign
+        env:
+          MOCIKA_SHIELD_KS_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+          MOCIKA_SHIELD_KEY_PASS: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -V | tail -1)
+          ./mocika/target/release/shield sign \
+            -i "output/protected.apk" \
+            -o "output/signed.apk" \
+            --ks release.keystore \
+            --key-alias "${{ secrets.KEY_ALIAS }}" \
+            --ks-type jks \
+            --apksigner "$APKSIGNER" \
+            --json | tee sign.log
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: encrypted-apk
+          path: |
+            output/signed.apk
+            protect.log
+            sign.log
