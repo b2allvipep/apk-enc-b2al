@@ -29,12 +29,16 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
-
       - name: Install tools
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq apktool zipalign
+
+      - name: Find Android SDK
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          find $ANDROID_HOME -name apksigner 2>/dev/null | head -5
+          find / -name apksigner -type f 2>/dev/null | head -5
 
       - name: Clone Mocika
         run: git clone --depth 1 --branch v1.4.0 https://github.com/mocikadev/mocika-shield.git mocika
@@ -52,7 +56,9 @@ jobs:
           mkdir -p output
           APK=$(ls *.apk | head -1)
           APKTOOL=$(which apktool)
-          APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -V | tail -1)
+          APKSIGNER=$(find / -name apksigner -type f 2>/dev/null | sort -V | tail -1)
+          echo "apktool: $APKTOOL"
+          echo "apksigner: $APKSIGNER"
           ./mocika/target/release/shield protect \
             -i "$APK" \
             -o "output/protected.apk" \
@@ -65,7 +71,7 @@ jobs:
           MOCIKA_SHIELD_KS_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
           MOCIKA_SHIELD_KEY_PASS: ${{ secrets.KEY_PASSWORD }}
         run: |
-          APKSIGNER=$(find $ANDROID_HOME/build-tools -name apksigner | sort -V | tail -1)
+          APKSIGNER=$(find / -name apksigner -type f 2>/dev/null | sort -V | tail -1)
           ./mocika/target/release/shield sign \
             -i "output/protected.apk" \
             -o "output/signed.apk" \
@@ -82,3 +88,4 @@ jobs:
             output/signed.apk
             protect.log
             sign.log
+          if-no-files-found: warn
