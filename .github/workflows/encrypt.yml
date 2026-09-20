@@ -42,6 +42,17 @@ jobs:
           cd mocika
           cargo build --release -p shield-cli
 
+      - name: Build Stub
+        run: |
+          cd mocika
+          echo "=== Makefile ==="
+          cat Makefile
+          echo "=== Coba build-stub ==="
+          make build-stub || echo "build-stub failed"
+          echo "=== Cari resources.zip ==="
+          find . -name "resources.zip" 2>/dev/null
+          find . -name "*.zip" 2>/dev/null | head -20
+
       - name: Decode keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '\n\r ' | xxd -r -p > release.keystore
